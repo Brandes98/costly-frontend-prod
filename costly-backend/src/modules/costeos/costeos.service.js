@@ -23,13 +23,38 @@ const INCLUDE_COSTEO = {
 export const getAll = async (empresa_id, filters = {}) => {
   return await prisma.costeo.findMany({
     where: {
-      importaciones_rel: { some: { importacion: { empresa_id } } },
+      OR: [
+        { importaciones_rel: { some: { importacion: { empresa_id } } } },
+        { pedidos_rel: { some: { pedido: { empresa_id } } } },
+      ],
       ...(filters.estado && { estado: filters.estado }),
     },
     include: {
       importaciones_rel: {
-        include: { importacion: { select: { codigo: true, estado: true } } }
-      },
+  include: {
+    importacion: {
+      select: {
+        codigo: true,
+        estado: true,
+        pedidos: {                          // ← agregar
+          select: {
+            proveedor: { select: { nombre: true } }
+          }
+        }
+      }
+    }
+  }
+},
+      pedidos_rel: {
+  include: {
+    pedido: {
+      select: {
+        codigo: true,
+        proveedor: { select: { nombre: true } }  // ← agregar
+      }
+    }
+  }
+},
     },
     orderBy: { creado_en: 'desc' },
   })
@@ -49,6 +74,16 @@ export const getById = async (empresa_id, costeo_id) => {
 
 export const create = async (empresa_id, usuario_id, data) => {
   const importacion_ids = data.importacion_ids || [data.importacion_id]
+   
+  // Verificar que no exista costeo aprobado para estas importaciones
+  const costeoAprobado = await prisma.costeo.findFirst({
+    where: {
+      estado: 'aprobado',
+      importaciones_rel: { some: { importacion_id: { in: importacion_ids } } }
+    }
+  })
+  if (costeoAprobado)
+    throw new AppError('Ya existe un costeo aprobado para esta importación', 400, 'COSTEO_YA_APROBADO')
 
   // Verificar que todas las importaciones existen y pertenecen a la empresa
   const importaciones = await prisma.importacion.findMany({
@@ -143,7 +178,13 @@ export const create = async (empresa_id, usuario_id, data) => {
 
 export const update = async (empresa_id, costeo_id, data) => {
   const costeo = await prisma.costeo.findFirst({
-    where: { costeo_id, importaciones_rel: { some: { importacion: { empresa_id } } } }
+    where: {
+      costeo_id,
+      OR: [
+        { importaciones_rel: { some: { importacion: { empresa_id } } } },
+        { pedidos_rel: { some: { pedido: { empresa_id } } } },
+      ]
+    }
   })
   if (!costeo) throw new AppError('Costeo no encontrado', 404, 'COSTEO_NOT_FOUND')
   if (costeo.estado !== 'borrador')
@@ -151,7 +192,6 @@ export const update = async (empresa_id, costeo_id, data) => {
 
   const { importacion_ids, importacion_id, ...updateData } = data
 
-  // Si viene lista de importaciones nueva, sincronizarla
   if (importacion_ids?.length) {
     await prisma.costeo_importacion.deleteMany({ where: { costeo_id } })
     await prisma.costeo_importacion.createMany({
@@ -174,6 +214,17 @@ export const aprobar = async (empresa_id, costeo_id, usuario_id) => {
     where: { costeo_id },
     data: { estado: 'aprobado', aprobado_por: usuario_id, aprobado_en: new Date() }
   })
+
+   // Actualizar importaciones relacionadas a cerrada
+  const impIds = costeo.importaciones_rel.map(r => r.importacion_id)
+  if (impIds.length) {
+    await prisma.importacion.updateMany({
+      where: { importacion_id: { in: impIds } },
+      data: { estado: 'cerrada' }
+    })
+  }
+
+  return resultado
 }
 
 // ── Eliminar costeo
