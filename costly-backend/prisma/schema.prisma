@@ -333,7 +333,7 @@ model cliente {
   cliente_id     Int         @id @default(autoincrement())
   empresa_id     Int
   nombre         String      @db.VarChar(150)
-  cedula         String?     @unique @db.VarChar(20)
+  cedula         String?     @db.VarChar(20)
   tipo           TipoCliente
   moneda         String      @db.Char(3)
   descuento_pct  Decimal?    @db.Decimal(5, 2)
@@ -343,6 +343,7 @@ model cliente {
   // Relaciones
   empresa  empresa  @relation(fields: [empresa_id], references: [empresa_id])
   pedidos  pedido[]
+  @@unique([empresa_id, cedula])
 }
 
 // ------------------------------------------------------------
@@ -351,7 +352,7 @@ model cliente {
 model producto {
   producto_id       Int        @id @default(autoincrement())
   empresa_id        Int
-  sku               String     @unique @db.VarChar(50)
+  sku               String     @db.VarChar(50)
   nombre            String     @db.VarChar(150)
   descripcion       String?    @db.Text
   categoria         String?    @db.VarChar(80)
@@ -392,6 +393,7 @@ model producto {
   empresa        empresa        @relation(fields: [empresa_id], references: [empresa_id])
   lineas_pedido  linea_pedido[]
   permisos       permiso[]
+  @@unique([empresa_id, sku])
 }
 
 // ------------------------------------------------------------
@@ -406,7 +408,7 @@ model pedido {
   creado_por      Int
 
   // Identificación
-  codigo          String       @unique @db.VarChar(30)  // PED-2025-018
+  codigo          String       @db.VarChar(30)  // PED-2025-018
   codigo_padre    String?      @db.VarChar(30)          // si es subpedido
   subindice       String?      @db.VarChar(5)           // "A", "B", "C"
 
@@ -434,6 +436,7 @@ model pedido {
   historial_union  pedidos_historial_union[]
   proyeccion       proyeccion_volumen?
   costeos_rel  costeo_pedido[]
+  @@unique([empresa_id, codigo])
 }
 
 // ------------------------------------------------------------
@@ -443,7 +446,7 @@ model importacion {
   importacion_id  Int               @id @default(autoincrement())
   empresa_id      Int
   creado_por      Int
-  codigo          String            @unique @db.VarChar(30)  // IMP-2025-004
+  codigo          String            @db.VarChar(30)  // IMP-2025-004
   descripcion     String?           @db.VarChar(200)
   fecha_union     DateTime?         @db.Date
   estado          EstadoImportacion @default(borrador)
@@ -459,6 +462,7 @@ model importacion {
   tramite_aduana   tramite_aduana?
   historial_union  pedidos_historial_union[]
   costeos_rel      costeo_importacion[]
+  @@unique([empresa_id, codigo])
 }
 
 // ------------------------------------------------------------
@@ -736,7 +740,7 @@ model pago {
 model tc_historico {
   tc_id      Int      @id @default(autoincrement())
   empresa_id Int
-  fecha      DateTime @unique @db.Date
+  fecha      DateTime @db.Date
   usd_crc    Decimal  @db.Decimal(10, 4)
   eur_crc    Decimal? @db.Decimal(10, 4)
   eur_usd    Decimal? @db.Decimal(10, 6)
@@ -745,6 +749,7 @@ model tc_historico {
 
   // Relaciones
   empresa empresa @relation(fields: [empresa_id], references: [empresa_id])
+  @@unique([empresa_id, fecha])
 }
 
 // ------------------------------------------------------------

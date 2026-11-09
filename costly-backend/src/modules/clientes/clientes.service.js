@@ -20,7 +20,7 @@ export const getById = async (empresa_id, cliente_id) => {
 
 export const create = async (empresa_id, data) => {
   if (data.cedula) {
-    const existe = await prisma.cliente.findUnique({ where: { cedula: data.cedula } })
+    const existe = await prisma.cliente.findFirst({ where: { cedula: data.cedula, empresa_id } })
     if (existe) throw new AppError('Ya existe un cliente con esa cédula', 409, 'CEDULA_DUPLICATE')
   }
   return await prisma.cliente.create({ data: { empresa_id, ...data } })
